@@ -1,0 +1,372 @@
+<html>
+	<script>
+		const AJUDA = "A";
+		const NAO_AJUDA = "N";
+		const TIPOS_RESPOSTA = [AJUDA, NAO_AJUDA];
+		function JogadorBasico(lista, nome, tipo) {
+			let jogador = new Object();
+			jogador.tipo = tipo;
+			jogador.historico = {};
+			jogador.legal = true;
+			jogador.totalPontos = 0;
+			if (nome) {
+				jogador.nome = nome;
+			} else {
+				let qtd = 1;
+				if (lista) {
+					lista.forEach(i => {
+						if (i.tipo == tipo) {
+							qtd ++;
+						}
+					});
+				}
+				jogador.nome = tipo + " " + qtd;
+			}
+			jogador.pontos = function(meu, dele) {
+				if (meu == AJUDA && dele == AJUDA) {
+					return 3;
+				} else 
+				if (meu == AJUDA && dele == NAO_AJUDA) {
+					return 0;
+				} else 
+				if (meu == NAO_AJUDA && dele == AJUDA) {
+					return 5;
+				} else 
+				if (meu == NAO_AJUDA && dele == NAO_AJUDA) {
+					return 1;
+				} else {
+					console.error("opções inválidas", meu, dele);
+				}
+			}
+			jogador.interage = function(nomeOutroJogador, resposta) {
+				//customizar
+				//console.log("interage", nomeOutroJogador, resposta);
+				let h = jogador.historico[nomeOutroJogador];
+				if (h) {
+					let negou = false;
+					h.respostas.forEach((i) => {
+						if (i == NAO_AJUDA) {
+							negou = true;
+						}
+					});
+					if (!negou && resposta == NAO_AJUDA) {
+						jogador.legal = false;
+					}
+				}
+				return resposta;
+			}
+			jogador.registraInteracao = function(resp, respOutro, nomeOutroJogador) {
+				let pontos = jogador.pontos(resp, respOutro);
+				//console.log("registraInteracao", resp, respOutro, pontos);
+				jogador.registraHistorico(nomeOutroJogador, respOutro);
+				jogador.totalPontos += pontos;
+			}
+			jogador.registraHistorico = function(nomeOutroJogador, resp) {
+				let h = jogador.historico[nomeOutroJogador];
+				if (!h) {
+					jogador.historico[nomeOutroJogador] = {respostas: []};
+				}
+				jogador.historico[nomeOutroJogador].respostas.push(resp);
+			}
+			jogador.copia = function(lista) {
+				return new jogador.classe(lista, null);
+			}
+			return jogador;
+		}
+		function JogadorAleatorio(lista, nome, chanceFavoravel) {
+			let tipo = "aleatório";
+			if (chanceFavoravel == null) {
+				chanceFavoravel = 0.5;
+			}
+			tipo += " (" + chanceFavoravel * 100 + "% fav.)";
+			let jogador = JogadorBasico(lista, nome, tipo);
+			jogador.classe = JogadorAleatorio;
+			let superInterage = jogador.interage;
+			jogador.interage = function(nomeOutroJogador) {
+				if (Math.random() <= chanceFavoravel) {
+					return superInterage(nomeOutroJogador, AJUDA);
+				} else {
+					return superInterage(nomeOutroJogador, NAO_AJUDA);
+				}
+			}
+			jogador.copia = function(lista) {
+				return JogadorAleatorio(lista, null, chanceFavoravel);
+			}
+			return jogador;
+		}
+		function JogadorDentePorDente(lista, nome, tolerancia) {
+			let tipo = "dente por dente";
+			if (!tolerancia) {
+				tolerancia = 0;
+			}
+			tipo += " (" + tolerancia * 100 + "% tol.)";
+			let jogador = JogadorBasico(lista, nome, tipo);
+			jogador.classe = JogadorDentePorDente;
+			let superInterage = jogador.interage;
+			jogador.interage = function(nomeOutroJogador) {
+				let h = jogador.historico[nomeOutroJogador];
+				if (h) {
+					if (h.respostas[h.respostas.length-1] == NAO_AJUDA) {
+						if (Math.random() <= tolerancia) {
+							return superInterage(nomeOutroJogador, AJUDA);
+						} else {
+							return superInterage(nomeOutroJogador, NAO_AJUDA);
+						}
+					} else {
+						return superInterage(nomeOutroJogador, AJUDA);
+					}
+				} else {
+					return superInterage(nomeOutroJogador, AJUDA);
+				}
+			}
+			jogador.copia = function(lista) {
+				return JogadorDentePorDente(lista, null, tolerancia);
+			}
+			return jogador;
+		}
+		function JogadorTolerante(lista, nome, qtd) {
+			let tipo = "tolerante";
+			if (!qtd) {
+				qtd = 2;
+			}
+			tipo += " (" + qtd + " vez.)";
+			let jogador = JogadorBasico(lista, nome, tipo);
+			jogador.classe = JogadorTolerante;
+			let superInterage = jogador.interage;
+			jogador.interage = function(nomeOutroJogador) {
+				let h = jogador.historico[nomeOutroJogador];
+				if (h) {
+					let ajuda = AJUDA;
+					for (let i = 0; i < qtd; i++) {
+						if (h.respostas[h.respostas.length-i-1] == NAO_AJUDA) {
+							ajuda = NAO_AJUDA;
+						} else {
+							ajuda = AJUDA;
+						}
+					}
+					//console.log("ajuda", ajuda);
+					return superInterage(nomeOutroJogador, ajuda);
+				} else {
+					return superInterage(nomeOutroJogador, AJUDA);
+				}
+			}
+			jogador.copia = function(lista) {
+				return JogadorTolerante(lista, null, qtd);
+			}
+			return jogador;
+		}
+		function JogadorRancoroso(lista, nome, qtd) {
+			let tipo = "rancoroso";
+			if (!qtd) {
+				qtd = 1;
+			}
+			tipo += " (" + qtd + " vez.)";
+			let jogador = JogadorBasico(lista, nome, tipo);
+			jogador.classe = JogadorRancoroso;
+			let superInterage = jogador.interage;
+			jogador.interage = function(nomeOutroJogador) {
+				let h = jogador.historico[nomeOutroJogador];
+				if (h) {
+					let n = 0;
+					h.respostas.forEach(r => {
+						if (r == NAO_AJUDA) {
+							n++;
+						}
+					});
+					//console.log("interage", naoAjudou);
+					if (n >= qtd) {
+						return superInterage(nomeOutroJogador, NAO_AJUDA);
+					} else {
+						return superInterage(nomeOutroJogador, AJUDA);
+					}
+				} else {
+					return superInterage(nomeOutroJogador, AJUDA);
+				}
+			}
+			jogador.copia = function(lista) {
+				return JogadorRancoroso(lista, null, qtd);
+			}
+			return jogador;
+		}
+		function JogadorSorrateiro(lista, nome, percentual) {
+			let tipo = "sorrateiro";
+			if (!percentual) {
+				percentual = 0.1;
+			}
+			tipo += " (" + percentual * 100 + "% engana)";
+			let jogador = JogadorBasico(lista, nome, tipo);
+			jogador.classe = JogadorSorrateiro;
+			let superInterage = jogador.interage;
+			jogador.interage = function(nomeOutroJogador) {
+				let h = jogador.historico[nomeOutroJogador];
+				if (h) {
+					if (h.respostas[h.respostas.length-1] == AJUDA) {
+						if (Math.random() <= percentual) {
+							return superInterage(nomeOutroJogador, NAO_AJUDA);
+						} else {
+							return superInterage(nomeOutroJogador, AJUDA);
+						}
+					} else {
+						return superInterage(nomeOutroJogador, NAO_AJUDA);
+					}
+				} else {
+					return superInterage(nomeOutroJogador, AJUDA);
+				}
+			}
+			jogador.copia = function(lista) {
+				return JogadorSorrateiro(lista, null, percentual);
+			}
+			return jogador;
+		}
+		function JogadorTestador(lista, nome) {
+			let jogador = JogadorBasico(lista, nome, "testador");
+			jogador.classe = JogadorTestador;
+			let superInterage = jogador.interage;
+			jogador.interage = function(nomeOutroJogador) {
+				let h = jogador.historico[nomeOutroJogador];
+				if (h) {
+					if (jogador.testador) {
+						if (h.respostas[h.respostas.length-1] == AJUDA) {
+							if (jogador.respostaAlternada == AJUDA) {
+								jogador.respostaAlternada = NAO_AJUDA;
+								return superInterage(nomeOutroJogador, AJUDA);
+							} else {
+								jogador.respostaAlternada = AJUDA;
+								return superInterage(nomeOutroJogador, NAO_AJUDA);
+							}
+						} else {
+							jogador.testador = false;
+							return superInterage(nomeOutroJogador, AJUDA);
+						}
+					} else {
+						return superInterage(nomeOutroJogador, h.respostas[h.respostas.length-1]);
+					}
+				} else {
+					jogador.testador = true;
+					jogador.respostaAlternada = AJUDA;
+					return superInterage(nomeOutroJogador, NAO_AJUDA);
+				}
+			}
+			return jogador;
+		}
+		function Interacao(jogador1, jogador2) {
+			let resp1 = jogador1.interage(jogador2.nome);
+			let resp2 = jogador2.interage(jogador1.nome);
+			jogador1.registraInteracao(resp1, resp2, jogador2.nome);
+			jogador2.registraInteracao(resp2, resp1, jogador1.nome);
+			//console.log("Interacao", resp1, resp2);
+		}
+		function duplicaLista(lista) {
+			let lista2 = [].concat(lista);
+			for (let i = 0; i < lista.length; i++) {
+				if (lista[i].classe) {
+					lista2.push(lista[i].copia(lista2));
+				}
+			}
+			return lista2;
+		}
+		function inicializar() {
+			let lista = [];
+			lista.push(new JogadorAleatorio(lista));
+			lista.push(new JogadorAleatorio(lista, "nega tudo", 0));
+			lista.push(new JogadorAleatorio(lista, null, 0.2));
+			lista.push(new JogadorAleatorio(lista, null, 0.4));
+			lista.push(new JogadorAleatorio(lista, null, 0.6));
+			lista.push(new JogadorAleatorio(lista, null, 0.8));
+			lista.push(new JogadorAleatorio(lista, "aceita tudo", 1));
+			lista.push(new JogadorSorrateiro(lista, null, 0.001));
+			lista.push(new JogadorSorrateiro(lista, null, 0.01));
+			lista.push(new JogadorSorrateiro(lista, null, 0.1));
+			lista.push(new JogadorSorrateiro(lista, null, 0.2));
+			lista.push(new JogadorSorrateiro(lista, null, 0.3));
+			lista.push(new JogadorSorrateiro(lista, null, 0.5));
+			lista.push(new JogadorTestador(lista));
+			lista.push(new JogadorTestador(lista));
+			lista.push(new JogadorTestador(lista));
+			lista.push(new JogadorTestador(lista));
+			lista.push(new JogadorRancoroso(lista));
+			lista.push(new JogadorRancoroso(lista, null, 2));
+			lista.push(new JogadorRancoroso(lista, null, 3));
+			lista.push(new JogadorRancoroso(lista, null, 5));
+			lista.push(new JogadorRancoroso(lista, null, 10));
+			lista.push(new JogadorTolerante(lista));
+			lista.push(new JogadorTolerante(lista, null, 3));
+			lista.push(new JogadorTolerante(lista, null, 4));
+			lista.push(new JogadorTolerante(lista, null, 5));
+			lista.push(new JogadorDentePorDente(lista));
+			lista.push(new JogadorDentePorDente(lista, null, 0.9));
+			lista.push(new JogadorDentePorDente(lista, null, 0.8));
+			lista.push(new JogadorDentePorDente(lista, null, 0.7));
+			lista.push(new JogadorDentePorDente(lista, null, 0.6));
+			lista.push(new JogadorDentePorDente(lista, null, 0.5));
+			lista.push(new JogadorDentePorDente(lista, null, 0.4));
+			lista.push(new JogadorDentePorDente(lista, null, 0.3));
+			lista.push(new JogadorDentePorDente(lista, null, 0.2));
+			lista.push(new JogadorDentePorDente(lista, null, 0.1));
+			
+			//lista = duplicaLista(lista);
+			//lista = duplicaLista(lista);
+			//lista = duplicaLista(lista);
+			//lista = duplicaLista(lista);
+			
+			let somaPontos = 0;
+			let somaPontosAnterior = -1;
+			for (let j = 0; j < 50; j++) {
+				for (let i = 0; i < lista.length; i++) {
+					for (let j = 0; j < lista.length; j++) {
+						if (i != j) {
+							for (let c = 0; c < 200; c++) {
+								Interacao(lista[i], lista[j]);
+							}
+						}
+					}
+				}
+				lista.sort((a, b) => {
+					return b.totalPontos - a.totalPontos;
+				});
+				somaPontosAnterior = somaPontos;
+				somaPontos = 0;
+				lista.forEach(i => {
+					somaPontos += i.totalPontos;
+				});
+				if (somaPontosAnterior == somaPontos) {
+					console.log("finalizado na rodada " + j);
+					break;
+				}
+				let b = document.body;
+				let t = document.createElement("table");
+				b.appendChild(t);
+				let r = t.insertRow();
+				r.insertCell().innerHTML = "<b>Rodada " + (j+1) + ": </b>";
+				r.insertCell().innerHTML = somaPontos + " pontos totais";
+				r = t.insertRow();
+				r.insertCell().innerHTML = "<b>Posição</b>";
+				r.insertCell().innerHTML = "<b>Nome</b>";
+				r.insertCell().innerHTML = "<b>Tipo</b>";
+				r.insertCell().innerHTML = "<b>Pontuação</b>";
+				r.insertCell().innerHTML = "<b>Legal?</b>";
+				for (let i = 0; i < lista.length; i++) {
+					let r = t.insertRow();
+					r.insertCell().textContent = "" + (i+1);
+					r.insertCell().textContent = lista[i].nome;
+					r.insertCell().textContent = lista[i].tipo;
+					r.insertCell().textContent = lista[i].totalPontos;
+					r.insertCell().textContent = lista[i].legal;
+					//console.log(lista[i].tipo, lista[i].totalPontos);
+					lista[i].totalPontos = 0;
+					lista[i].historico = {};
+					lista[i].legal = true;
+				}
+
+				//Pega o pior desempenho e trocar pelo melhor tipo
+				let primeiro = lista[0].copia(lista);
+				let ultimo = lista.pop();
+				lista.push(primeiro);
+				//console.log("troca", primeiro, ultimo);
+			}
+		}
+	</script>
+	<body onload="inicializar()">
+		<h3>Teoria do Jogos:</h3>
+	</body>
+</html>

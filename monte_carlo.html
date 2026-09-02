@@ -1,0 +1,411 @@
+<html>
+	<style>
+		table, th, td {
+		  border: 1px solid black;
+		}
+		canvas {
+			border:1px solid grey;
+			width: 800;
+			height: 300;
+		}
+	</style>
+	<script>
+		function distUniformeContinua(min = 0, max = 1) {
+			return Math.random() * (max - min) + min;
+		}
+		function distUniformeDiscreta(min, max, incluiMax) {
+			min = Math.ceil(min);
+			max = Math.floor(max);
+			if (incluiMax) {
+				return Math.floor(Math.random() * (max - min + 1)) + min;
+			} else {
+				return Math.floor(Math.random() * (max - min)) + min;
+			}
+		}
+		function distNormalContinua(mean = 0, stdev = 1) {
+			//Box-Muller transform.
+			const u = 1 - Math.random();
+			const v = Math.random();
+			const z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+			return z * stdev + mean;
+		}
+		function distNormalDiscreta(mean = 0, stdev = 1) {
+			let v = distNormalContinua(mean, stdev);
+			return Math.round(v);
+		}
+		function distNormalContinuaTCL(mean = 0, stdev = 1) {
+			//https://pt.wikipedia.org/wiki/Teorema_central_do_limite
+			//https://pt.wikipedia.org/wiki/Distribui%C3%A7%C3%A3o_uniforme
+			let soma = 0;
+			let qtd = 100;
+			let desvio = Math.sqrt(12/4 * Math.pow(stdev, 2) * qtd);
+			for (let i = 0; i < qtd; i++) {
+				soma += distUniformeContinua(mean - desvio, mean + desvio);
+			}
+			return soma/qtd;
+		}
+		function distTriangularContinua(...par) {
+			let min = par[0];
+			let max = par[1];
+			let moda = par[2];
+			let F = (moda - min) / (max - min);
+			let rand = Math.random();
+			//console.log("distTriangularContinua", F, rand, rand <= F);
+			if (min >= max || moda < min || moda > max) {
+				return NaN;
+			}
+			if (rand <= F) {
+				return min + Math.sqrt(rand * (max - min) * (moda - min));
+			} else {
+				return max - Math.sqrt((1 - rand) * (max - min) * (max - moda));
+			}
+		}
+		function distTriangularDiscreta(...par) {
+			let v = distTriangularContinua(par);
+			return Math.round(v);
+		}
+		//Valor fixo (sem sorteio)
+		function distFixa(...par) {
+			return par[0];
+		}
+		function histograma(min, max, passo) {
+			let h = new Object();
+			let tam = Math.round((max - min) / passo) + 1;
+			let arr = new Array(tam);
+			//console.log("histograma", min, max, passo, tam, arr);
+			h.add = function(num) {
+				if (num < min) {
+					num = min;
+				}
+				if (num > max) {
+					num = max;
+				}
+				let pos = Math.round((num - min) / passo);
+				if (arr[pos]) {
+					arr[pos]++;
+				} else {
+					arr[pos] = 1;
+				}
+				//console.log("add", num, pos);
+			}
+			h.getArray = function() {
+				return arr;
+			}
+			h.mostrar = function(id, msg) {
+				let t = document.getElementById(id);
+				let r = t.insertRow();
+				let c = r.insertCell();
+				c.colSpan = tam;
+				let rh = t.insertRow();
+				let rq = t.insertRow();
+				let rp = t.insertRow();
+				let ra = t.insertRow();
+				if (msg) {
+					let r = t.insertRow();
+					let c = r.insertCell();
+					c.colSpan = tam;
+					c.innerHTML = msg;
+				}
+				let total = 0;
+				for (let i = 0; i < tam; i++) {
+					let c = rh.insertCell();
+					c.textContent = parseFloat(min + i * passo).toFixed(0);
+					c = rq.insertCell();
+					c.textContent = arr[i];
+					if (arr[i]) {
+						total += arr[i];
+					}
+				}
+				c.textContent = total + " iterações, de " + min + " até " + max + ", passo: " + passo;
+				for (let i = 0; i < tam; i++) {
+					let c = rp.insertCell();
+					if (arr[i]) {
+						c.textContent = parseFloat((arr[i] / total) * 100).toFixed(1);
+					} else {
+						c.textContent = 0;
+					}
+				}
+				let acumulado = 0;
+				for (let i = 0; i < tam; i++) {
+					let c = ra.insertCell();
+					if (arr[i]) {
+						acumulado += (arr[i] / total) * 100
+					}
+					c.textContent = parseFloat(acumulado).toFixed(1);
+				}
+				//console.log("total", total);
+			}
+			h.desenha = function(id, compararNormal, cor) {
+				function mapX(largCanvas, largMax, qtd) {
+					return largCanvas * qtd / largMax;
+				}
+				function mapY(altCanvas, altMax, qtd) {
+					return - altCanvas * qtd / altMax;
+				}
+				const c = document.getElementById(id);
+				console.log("canvas", id, c.width);
+				let larg = c.width / tam;
+				//console.log("desenha", id, c.width, larg);
+				let maior = 0;
+				for (let i = 0; i < tam; i++) {
+					if (maior < arr[i]) {
+						maior = arr[i];
+					}
+				}
+				c.addEventListener('mousedown', function (e) {
+					console.log('mousedown', e.offsetX, e.offsetY, min, max, tam, maior, c.width, c.height);
+					console.log('->', min + e.offsetX * (max - min) / 800);
+					console.log('->', maior - e.offsetY * maior / 300);
+				});
+				const ctx = c.getContext("2d");
+				if (cor) {
+					ctx.fillStyle = cor;
+				} else {
+					ctx.fillStyle = "gray";
+				}
+				ctx.beginPath();
+				let total = 0;
+				for (let i = 0; i < tam; i++) {
+					if (arr[i]) {
+						total += arr[i];
+					}
+					ctx.fillRect(mapX(c.width, tam, i), c.height, larg, mapY(c.height, maior, arr[i]));
+					
+				}
+				ctx.stroke();
+				if (compararNormal) {
+					let hn = histograma(min, max, passo);
+					//console.log("normal", min, max, passo, total, h.media(), h.desvioPadrao());
+					let normal = VariavelAleatoria(distNormalContinua, h.media(), h.desvioPadrao());
+					for (let i = 0; i < total; i++) {
+						hn.add(normal.get());
+					}
+					if (tam < 50) {
+						ctx.lineWidth = 1;
+					} else {
+						ctx.lineWidth = 0.5;
+					}
+					//console.log("hn", arr, hn.getArray());
+					ctx.beginPath();
+					ctx.moveTo(0, c.height);
+					for (let i = 0; i < tam; i++) {
+						//console.log("linha", mapX(c.width, tam, i), mapY(c.height, maior, hn.getArray()[i]));
+						ctx.lineTo(mapX(c.width, tam, i + 0.5), c.height + mapY(c.height, maior, hn.getArray()[i]));
+					}
+					ctx.stroke();
+				}
+			}
+			h.acumulado = function(perc) {
+				function encontraLinear(pos, perc, total) {
+					let valor = 0;
+					let valorAnterior;
+					let acumulado = 0;
+					let acumuladoAnterior;
+					for (let i = 0; i <= pos; i++) {
+						if (i == pos) {
+							valor = min + i * passo;
+							valorAnterior = valor - passo;
+							acumuladoAnterior = acumulado;
+						}
+						if (arr[i]) {
+							acumulado += (arr[i] / total);
+						}
+					}
+					return valorAnterior + passo * (perc - acumuladoAnterior) / (acumulado - acumuladoAnterior);
+				}
+				let a = 0;
+				let total = 0;
+				for (let i = 0; i < tam; i++) {
+					if (arr[i]) {
+						total += arr[i];
+					}
+				}
+				for (let i = 0; i < tam; i++) {
+					if (arr[i]) {
+						a += (arr[i] / total);
+					}
+					if (perc <= a) {
+						return encontraLinear(i, perc, total);
+					}
+				}
+				return a;
+			}
+			h.media = function() {
+				let total = 0;
+				let qtd = 0;
+				for (let i = 0; i < tam; i++) {
+					if (arr[i]) {
+						total += arr[i] * (min + i * passo);
+						qtd += arr[i];
+					}
+				}
+				//console.log("média", total, qtd, total/qtd);
+				return total/qtd;
+			}
+			h.variancia = function(m) {
+				if (!m) {
+					m = h.media();
+				}
+				let soma = 0;
+				let qtd = 0;
+				for (let i = 0; i < tam; i++) {
+					if (arr[i]) {
+						soma += arr[i] * Math.pow(((min + i * passo) - m), 2);
+						qtd += arr[i];
+					}
+				}
+				return soma / (qtd - 1);;
+			}
+			h.desvioPadrao = function(m) {
+				return Math.sqrt(h.variancia(m));
+			}
+			return h;
+		}
+		function VariavelAleatoria(fnDist, ...par) {
+			let obj = new Object();
+			obj.get = function() {
+				return fnDist(...par);
+			}
+			obj.toString = function() {
+				return fnDist.name + "(" + par + ")";
+			}
+			return obj;
+		}
+		function Estoque(tamInicial, custoNormal, reposicaoNormal, minEmergencia, custoEmergencia, reposicaoEmergencia, consumo) {
+			let e = new Object();
+			let tam = tamInicial;
+			let reposicao;
+			let custo;
+			e.consumir = function() {
+				let c = e.getConsumo().get();
+				tam -= c;
+			}
+			e.repor = function() {
+				let c = e.getCusto().get();
+				let r = e.getReposicao().get();
+				tam += r;
+				return c * r;
+			}
+			e.reiniciar = function() {
+				tam = tamInicial;
+			}
+			e.getTamanhoInicial = function() {
+				return tamInicial;
+			}
+			e.getTamanho = function() {
+				return tam;
+			}
+			e.getMinEmergencia = function() {
+				return minEmergencia;
+			}
+			e.getCustoNormal = function() {
+				return custoNormal;
+			}
+			e.getCustoEmergencia = function() {
+				return custoEmergencia;
+			}
+			e.getReposicaoNormal = function() {
+				return reposicaoNormal;
+			}
+			e.getReposicaoEmergencia = function() {
+				return reposicaoEmergencia;
+			}
+			e.getConsumo = function() {
+				return consumo;
+			}
+			e.getCusto = function() {
+				if (tam <= minEmergencia) {
+					return custoEmergencia;
+				} else {
+					return custoNormal;
+				}
+			}
+			e.getReposicao = function() {
+				if (tam <= minEmergencia) {
+					return reposicaoEmergencia;
+				} else {
+					return reposicaoNormal;
+				}
+			}
+			return e;
+		}
+		function inicializar() {
+			let qtdIteracoes = 500000;
+			let qtdDias = 30;
+			let tamEstoqueInicial = 50;
+			let h = histograma(-5, tamEstoqueInicial, 3);
+			let hc = histograma(3000, 7500, 100);
+			
+			let estoque = Estoque(
+				tamEstoqueInicial, 										//tamanho inicial
+				VariavelAleatoria(distTriangularContinua, 8, 12, 10), 	//custo normal
+				VariavelAleatoria(distTriangularContinua, 4, 12, 7), 	//reposição normal
+				20, 													//tamanho do estoque de emergência 
+				VariavelAleatoria(distTriangularContinua, 15, 30, 20), 	//custo de emergência, 
+				VariavelAleatoria(distTriangularContinua, 10, 20, 15), 	//reposição de emergência
+				VariavelAleatoria(distTriangularContinua, 5, 20, 10) 	//cosumo
+			);
+			for (let i = 0; i < qtdIteracoes; i++) {
+				estoque.reiniciar();
+				let custoPeriodo = 0;
+				for (let j = 0; j < qtdDias; j++) {
+					estoque.consumir();
+					custoPeriodo += estoque.repor();
+				}
+				hc.add(custoPeriodo);
+				h.add(estoque.getTamanho());
+			}
+			h.mostrar("histo", 
+				"Estoque inicial: " + estoque.getTamanhoInicial() + 
+				"<br>Mínimo estoque de emergência: " + estoque.getMinEmergencia() + 
+				"<br>Reposição normal: " + estoque.getReposicaoNormal() + 
+				"<br>Reposição emergência: " + estoque.getReposicaoEmergencia() + 
+				"<br>Consumo: " + estoque.getConsumo()
+			);
+			hc.mostrar("histoCusto", 
+				"Custo normal: " + estoque.getCustoNormal() + 
+				"<br>Custo emergência: " + estoque.getCustoEmergencia() +
+				"<br>Custo total médio: " + hc.media().toFixed(2) + " (" + qtdDias + " dias)" +
+				"<br>Custo 80%: " + hc.acumulado(0.8).toFixed(2) +
+				"<br>Desvio padrão: " + hc.desvioPadrao().toFixed(2)
+			);
+			hc.desenha("canvasCusto", true, "cyan");
+			console.log("sorteio tamanho estoque", h.acumulado(Math.random()).toFixed(0));
+			console.log("sorteio custo", hc.acumulado(Math.random()).toFixed(2));
+			
+			let ht = histograma(100, 300, 5);
+			//let teste = VariavelAleatoria(distNormalContinua, 200, 30);
+			let teste = VariavelAleatoria(distTriangularContinua, 100, 300, 250);
+			//let teste = VariavelAleatoria(distNormalContinuaTCL, 200, 30);
+			//let teste = VariavelAleatoria(distFixa, 200);
+			//let teste = VariavelAleatoria(distUniformeDiscreta, 150, 250);
+			for (let i = 0; i < 100000; i++) {
+				ht.add(teste.get());
+			}
+			ht.mostrar("histoTeste", 
+				teste +
+				"<br>Média: " + ht.media() +
+				"<br>Variância: " + ht.variancia() +
+				"<br>Desvio padrão: " + ht.desvioPadrao()
+			);
+			ht.desenha("canvasTeste", true, "#ff0099");
+		}
+	</script>
+	<body onload="inicializar()">
+		<h3>Simulação de Monte Carlo:</h3>
+		<h4>Consumo e reposição de estoque</h4>
+		<span id="va1"></span>
+		<h5>Tamanho do Estoque</h5>
+		<table id="histo"></table>
+		<h5>Custo</h5>
+		<table id="histoCusto"></table>
+		<div style="text-align:center;">
+			<canvas id="canvasCusto"></canvas>
+		</div>
+		<h4>Teste</h4>
+		<table id="histoTeste"></table>
+		<div style="text-align:center;">
+			<canvas id="canvasTeste"></canvas>
+		</div>
+	</body>
+</html>
