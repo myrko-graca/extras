@@ -1,0 +1,42 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Fractal de Mandelbrot - Convergência Suave</title>
+  <style>
+    body { margin: 0; background: #000; color: white; font-family: sans-serif; }
+    canvas { border: 1px solid #333; display: block; margin: auto; }
+    #controls { text-align: center; margin-top: 10px; }
+  </style> 
+</head>
+<body>
+  <canvas id="mandelbrot" width="800" height="600"></canvas>
+  <div id="controls">
+    <label for="palette">Paleta de cores:</label>
+    <select id="palette">
+      <option value="gray">Cinza</option>
+      <option value="convergence_smooth">Convergência Suave</option>
+      <option value="convergence_red">Convergência Vermelha</option>
+      <option value="convergence_green">Convergência Verde</option>
+      <option value="preto_branco">Preto e branco</option>
+    </select>
+    <label for="zoomLevel">Zoom (%):</label>
+    <select id="zoomLevel">
+      <option value="0.25">-300%</option>
+      <option value="0.33333">-200%</option>
+      <option value="0.5">-100%</option>
+      <option value="0.66667">-50%</option>
+      <option value="0.83333">-20%</option>
+      <option value="1.0">0%</option>
+      <option value="1.2" selected>20%</option>
+      <option value="1.5">50%</option>
+      <option value="2.0">100%</option>
+      <option value="3.0">200%</option>
+      <option value="4.0">300%</option>
+    </select>
+    <div id="info"></div>
+  </div>
+  <script src="main.js?3"></script>
+</body>
+</html>
